@@ -2,12 +2,15 @@
   "name": "pub-sub-typescript",
   "type": "module",
   "scripts": {
+    "rabbit:start": "bash src/scripts/rabbit.sh start",
+    "rabbit:stop": "bash src/scripts/rabbit.sh stop",
+    "rabbit:logs": "bash src/scripts/rabbit.sh logs",
     "server": "npx tsx src/server/index.ts",
     "client": "npx tsx src/client/index.ts",
     "build": "tsc"
   },
   "dependencies": {
-    "amqplib": "^0.10.8"
+    "amqplib": "^0.10.9"
   },
   "devDependencies": {
     "@types/amqplib": "^0.10.7",
