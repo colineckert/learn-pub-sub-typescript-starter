@@ -1,5 +1,5 @@
 import readline from "readline";
-import { GameState } from "./gamestate.js";
+import type { GameState } from "./gamestate.js";
 
 const rl = readline.createInterface({
   input: process.stdin,
@@ -84,7 +84,7 @@ export async function commandStatus(gs: GameState): Promise<void> {
 
   const p = gs.getPlayerSnap();
   console.log(
-    `You are ${p.username}, and you have ${Object.keys(p.units).length} units.`
+    `You are ${p.username}, and you have ${Object.keys(p.units).length} units.`,
   );
 
   for (const unit of Object.values(p.units)) {

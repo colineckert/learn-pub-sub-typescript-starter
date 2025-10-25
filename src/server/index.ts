@@ -1,29 +1,60 @@
 import amqp from "amqplib";
+import { getInput, printServerHelp } from "../internal/gamelogic/gamelogic.js";
 import { publishJSON } from "../internal/pubsub/publish-json.js";
 import { ExchangePerilDirect, PauseKey } from "../internal/routing/routing.js";
-import type { PlayingState } from "../internal/gamelogic/gamestate.js";
 
 async function main() {
   const rabbitConnString = "amqp://guest:guest@localhost:5672/";
   const conn = await amqp.connect(rabbitConnString);
   console.log("Peril game server connected to RabbitMQ!");
 
-  const channel = await conn.createConfirmChannel();
-  const state: PlayingState = { isPaused: true };
-  await publishJSON(channel, ExchangePerilDirect, PauseKey, state);
-
   ["SIGINT", "SIGTERM"].forEach((signal) =>
     process.on(signal, async () => {
       try {
         await conn.close();
-        console.log("RabbitMQ server connection closed.");
+        console.log("RabbitMQ connection closed.");
       } catch (err) {
-        console.error("Error closing RabbitMQ server connection:", err);
+        console.error("Error closing RabbitMQ connection:", err);
       } finally {
         process.exit(0);
       }
     }),
   );
+
+  const publishCh = await conn.createConfirmChannel();
+
+  printServerHelp();
+
+  while (true) {
+    const words = await getInput();
+    if (words.length === 0) continue;
+
+    const command = words[0];
+    if (command === "pause") {
+      console.log("Publishing paused game state");
+      try {
+        await publishJSON(publishCh, ExchangePerilDirect, PauseKey, {
+          isPaused: true,
+        });
+      } catch (err) {
+        console.error("Error publishing pause message:", err);
+      }
+    } else if (command === "resume") {
+      console.log("Publishing resumed game state");
+      try {
+        await publishJSON(publishCh, ExchangePerilDirect, PauseKey, {
+          isPaused: false,
+        });
+      } catch (err) {
+        console.error("Error publishing resume message:", err);
+      }
+    } else if (command === "quit") {
+      console.log("Goodbye!");
+      process.exit(0);
+    } else {
+      console.log("Unknown command");
+    }
+  }
 }
 
 main().catch((err) => {
