@@ -16,9 +16,9 @@ async function main() {
     process.on(signal, async () => {
       try {
         await conn.close();
-        console.log("RabbitMQ connection closed.");
+        console.log("RabbitMQ server connection closed.");
       } catch (err) {
-        console.error("Error closing RabbitMQ connection:", err);
+        console.error("Error closing RabbitMQ server connection:", err);
       } finally {
         process.exit(0);
       }
