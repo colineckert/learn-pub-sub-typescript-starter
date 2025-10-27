@@ -5,11 +5,26 @@ import {
   getInput,
   printClientHelp,
 } from "../internal/gamelogic/gamelogic.js";
-import { GameState } from "../internal/gamelogic/gamestate.js";
+import {
+  GameState,
+  type PlayingState,
+} from "../internal/gamelogic/gamestate.js";
 import { commandMove } from "../internal/gamelogic/move.js";
+import { handlePause } from "../internal/gamelogic/pause.js";
 import { commandSpawn } from "../internal/gamelogic/spawn.js";
-import { declareAndBind } from "../internal/pubsub/declare-and-bind.js";
-import { ExchangePerilDirect, PauseKey } from "../internal/routing/routing.js";
+import { declareAndBind, subscribeJSON } from "../internal/pubsub/consume.js";
+import {
+  ExchangePerilDirect,
+  PauseKey,
+  SimpleQueueType,
+} from "../internal/routing/routing.js";
+
+function handlerPause(gs: GameState): (ps: PlayingState) => void {
+  return (ps: PlayingState) => {
+    handlePause(gs, ps);
+    process.stdout.write("> ");
+  };
+}
 
 async function main() {
   const rabbitConnString = "amqp://guest:guest@localhost:5672/";
@@ -31,15 +46,25 @@ async function main() {
 
   const username = await clientWelcome();
 
-  const [channel, queue] = await declareAndBind(
+  const [_, aq] = await declareAndBind(
     conn,
     ExchangePerilDirect,
     `pause.${username}`,
     PauseKey,
-    "transient",
+    SimpleQueueType.Transient,
   );
 
   const gameState = new GameState(username);
+  const pauseHandler = handlerPause(gameState);
+
+  await subscribeJSON(
+    conn,
+    ExchangePerilDirect,
+    aq.queue,
+    PauseKey,
+    SimpleQueueType.Transient,
+    pauseHandler,
+  );
 
   while (true) {
     const words = await getInput();
