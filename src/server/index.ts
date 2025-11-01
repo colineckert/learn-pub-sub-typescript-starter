@@ -31,10 +31,10 @@ async function main() {
 
   const publishCh = await conn.createConfirmChannel();
 
-  const [channel, queue] = await declareAndBind(
+  await declareAndBind(
     conn,
     ExchangePerilTopic,
-    "game_logs",
+    GameLogSlug,
     `${GameLogSlug}.*`,
     SimpleQueueType.Durable,
   );

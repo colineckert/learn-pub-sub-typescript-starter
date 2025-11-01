@@ -1,4 +1,4 @@
-import type { Player, Unit, Location } from "./gamedata.js";
+import type { Location, Player, Unit } from "./gamedata.js";
 
 export interface PlayingState {
   isPaused: boolean;

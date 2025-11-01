@@ -1,4 +1,5 @@
 import amqp from "amqplib";
+import type { ArmyMove } from "../internal/gamelogic/gamedata.js";
 import {
   clientWelcome,
   commandStatus,
@@ -9,20 +10,45 @@ import {
   GameState,
   type PlayingState,
 } from "../internal/gamelogic/gamestate.js";
-import { commandMove } from "../internal/gamelogic/move.js";
+import {
+  commandMove,
+  handleMove,
+  MoveOutcome,
+} from "../internal/gamelogic/move.js";
 import { handlePause } from "../internal/gamelogic/pause.js";
 import { commandSpawn } from "../internal/gamelogic/spawn.js";
-import { declareAndBind, subscribeJSON } from "../internal/pubsub/consume.js";
+import { subscribeJSON } from "../internal/pubsub/consume.js";
+import { publishJSON } from "../internal/pubsub/publish.js";
 import {
+  AckType,
+  ArmyMovesPrefix,
   ExchangePerilDirect,
+  ExchangePerilTopic,
   PauseKey,
   SimpleQueueType,
 } from "../internal/routing/routing.js";
 
-function handlerPause(gs: GameState): (ps: PlayingState) => void {
+function handlerPause(gs: GameState): (ps: PlayingState) => AckType {
   return (ps: PlayingState) => {
     handlePause(gs, ps);
     process.stdout.write("> ");
+
+    return AckType.Ack;
+  };
+}
+
+function handlerMove(gs: GameState): (move: ArmyMove) => AckType {
+  return (move: ArmyMove) => {
+    const moveOutcome = handleMove(gs, move);
+    process.stdout.write("> ");
+
+    if (
+      moveOutcome === MoveOutcome.Safe ||
+      moveOutcome === MoveOutcome.MakeWar
+    ) {
+      return AckType.Ack;
+    }
+    return AckType.NackDiscard;
   };
 }
 
@@ -45,25 +71,24 @@ async function main() {
   );
 
   const username = await clientWelcome();
-
-  const [_, aq] = await declareAndBind(
-    conn,
-    ExchangePerilDirect,
-    `pause.${username}`,
-    PauseKey,
-    SimpleQueueType.Transient,
-  );
-
   const gameState = new GameState(username);
-  const pauseHandler = handlerPause(gameState);
+  const publishConfirmChannel = await conn.createConfirmChannel();
 
   await subscribeJSON(
     conn,
     ExchangePerilDirect,
-    aq.queue,
+    `${PauseKey}.${username}`,
     PauseKey,
     SimpleQueueType.Transient,
-    pauseHandler,
+    handlerPause(gameState),
+  );
+  await subscribeJSON(
+    conn,
+    ExchangePerilTopic,
+    `${ArmyMovesPrefix}.${username}`,
+    `${ArmyMovesPrefix}.*`,
+    SimpleQueueType.Transient,
+    handlerMove(gameState),
   );
 
   while (true) {
@@ -81,8 +106,15 @@ async function main() {
     } else if (command === "move") {
       console.log("Executing move command");
       try {
-        commandMove(gameState, words);
+        const move = commandMove(gameState, words);
         console.log("Move command executed successfully");
+        await publishJSON(
+          publishConfirmChannel,
+          ExchangePerilTopic,
+          `${ArmyMovesPrefix}.${username}`,
+          move,
+        );
+        console.log("Move command published");
       } catch (err) {
         console.error("Error executing move command:", err);
       }

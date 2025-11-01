@@ -1,6 +1,6 @@
 import type amqp from "amqplib";
 import type { Channel } from "amqplib";
-import type { SimpleQueueType } from "../routing/routing.js";
+import { AckType, SimpleQueueType } from "../routing/routing.js";
 
 export async function declareAndBind(
   conn: amqp.ChannelModel,
@@ -27,7 +27,7 @@ export async function subscribeJSON<T>(
   queueName: string,
   key: string,
   queueType: SimpleQueueType, // an enum to represent "durable" or "transient"
-  handler: (data: T) => void,
+  handler: (data: T) => AckType,
 ): Promise<void> {
   const [channel, aq] = await declareAndBind(
     conn,
@@ -40,8 +40,17 @@ export async function subscribeJSON<T>(
   await channel.consume(aq.queue, (msg) => {
     if (msg) {
       const content = JSON.parse(msg.content.toString());
-      handler(content);
-      channel.ack(msg);
+      const ackType = handler(content);
+      if (ackType === AckType.Ack) {
+        console.log("Acknowledge message");
+        channel.ack(msg);
+      } else if (ackType === AckType.NackRequeue) {
+        console.log("Nack and requeue message");
+        channel.nack(msg, false, true);
+      } else {
+        console.log("Nack and discard message");
+        channel.nack(msg, false, false);
+      }
     }
   });
 }
