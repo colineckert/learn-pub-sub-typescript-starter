@@ -1,6 +1,10 @@
 import type amqp from "amqplib";
 import type { Channel } from "amqplib";
-import { AckType, SimpleQueueType } from "../routing/routing.js";
+import {
+  AckType,
+  ExchangePerilDeadLetter,
+  SimpleQueueType,
+} from "../routing/routing.js";
 
 export async function declareAndBind(
   conn: amqp.ChannelModel,
@@ -14,6 +18,9 @@ export async function declareAndBind(
     durable: queueType === "durable",
     autoDelete: queueType === "transient",
     exclusive: queueType === "transient",
+    arguments: {
+      "x-dead-letter-exchange": ExchangePerilDeadLetter,
+    },
   });
 
   await channel.bindQueue(aq.queue, exchange, key);
