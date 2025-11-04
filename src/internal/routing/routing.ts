@@ -11,9 +11,3 @@ export enum SimpleQueueType {
   Durable = "durable",
   Transient = "transient",
 }
-
-export enum AckType {
-  Ack,
-  NackRequeue,
-  NackDiscard,
-}

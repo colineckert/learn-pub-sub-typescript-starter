@@ -1,56 +1,24 @@
 import amqp from "amqplib";
-import type { ArmyMove } from "../internal/gamelogic/gamedata.js";
 import {
   clientWelcome,
   commandStatus,
   getInput,
   printClientHelp,
 } from "../internal/gamelogic/gamelogic.js";
-import {
-  GameState,
-  type PlayingState,
-} from "../internal/gamelogic/gamestate.js";
-import {
-  commandMove,
-  handleMove,
-  MoveOutcome,
-} from "../internal/gamelogic/move.js";
-import { handlePause } from "../internal/gamelogic/pause.js";
+import { GameState } from "../internal/gamelogic/gamestate.js";
+import { commandMove } from "../internal/gamelogic/move.js";
 import { commandSpawn } from "../internal/gamelogic/spawn.js";
 import { subscribeJSON } from "../internal/pubsub/consume.js";
 import { publishJSON } from "../internal/pubsub/publish.js";
 import {
-  AckType,
   ArmyMovesPrefix,
   ExchangePerilDirect,
   ExchangePerilTopic,
   PauseKey,
   SimpleQueueType,
+  WarRecognitionsPrefix,
 } from "../internal/routing/routing.js";
-
-function handlerPause(gs: GameState): (ps: PlayingState) => AckType {
-  return (ps: PlayingState) => {
-    handlePause(gs, ps);
-    process.stdout.write("> ");
-
-    return AckType.Ack;
-  };
-}
-
-function handlerMove(gs: GameState): (move: ArmyMove) => AckType {
-  return (move: ArmyMove) => {
-    const moveOutcome = handleMove(gs, move);
-    process.stdout.write("> ");
-
-    if (
-      moveOutcome === MoveOutcome.Safe ||
-      moveOutcome === MoveOutcome.MakeWar
-    ) {
-      return AckType.Ack;
-    }
-    return AckType.NackDiscard;
-  };
-}
+import { handlerMove, handlerPause, handlerWar } from "./handers.js";
 
 async function main() {
   const rabbitConnString = "amqp://guest:guest@localhost:5672/";
@@ -88,7 +56,15 @@ async function main() {
     `${ArmyMovesPrefix}.${username}`,
     `${ArmyMovesPrefix}.*`,
     SimpleQueueType.Transient,
-    handlerMove(gameState),
+    handlerMove(gameState, publishConfirmChannel),
+  );
+  await subscribeJSON(
+    conn,
+    ExchangePerilTopic,
+    WarRecognitionsPrefix,
+    `${WarRecognitionsPrefix}.*`,
+    SimpleQueueType.Durable,
+    handlerWar(gameState),
   );
 
   while (true) {
