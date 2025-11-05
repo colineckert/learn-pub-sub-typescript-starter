@@ -6,8 +6,3 @@ export const GameLogSlug = "game_logs";
 export const ExchangePerilDirect = "peril_direct";
 export const ExchangePerilTopic = "peril_topic";
 export const ExchangePerilDeadLetter = "peril_dlx";
-
-export enum SimpleQueueType {
-  Durable = "durable",
-  Transient = "transient",
-}

@@ -8,7 +8,7 @@ import {
 import { GameState } from "../internal/gamelogic/gamestate.js";
 import { commandMove } from "../internal/gamelogic/move.js";
 import { commandSpawn } from "../internal/gamelogic/spawn.js";
-import { subscribeJSON } from "../internal/pubsub/consume.js";
+import { SimpleQueueType, subscribeJSON } from "../internal/pubsub/consume.js";
 import { publishJSON, publishMsgPack } from "../internal/pubsub/publish.js";
 import {
   ArmyMovesPrefix,
@@ -16,7 +16,6 @@ import {
   ExchangePerilTopic,
   GameLogSlug,
   PauseKey,
-  SimpleQueueType,
   WarRecognitionsPrefix,
 } from "../internal/routing/routing.js";
 import { handlerMove, handlerPause, handlerWar } from "./handers.js";
