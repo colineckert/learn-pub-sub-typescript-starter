@@ -16,6 +16,7 @@ import {
   WarRecognitionsPrefix,
 } from "../internal/routing/routing.js";
 import { handleWar, WarOutcome } from "../internal/gamelogic/war.js";
+import { publishGameLog } from "./index.js";
 
 export function handlerPause(gs: GameState): (ps: PlayingState) => AckType {
   return (ps: PlayingState): AckType => {
@@ -65,10 +66,12 @@ export function handlerMove(
 
 export function handlerWar(
   gs: GameState,
+  ch: ConfirmChannel,
 ): (war: RecognitionOfWar) => Promise<AckType> {
   return async (war: RecognitionOfWar): Promise<AckType> => {
     try {
       const outcome = handleWar(gs, war);
+      let warLog: string = "";
 
       switch (outcome.result) {
         case WarOutcome.NotInvolved:
@@ -77,8 +80,21 @@ export function handlerWar(
           return AckType.NackDiscard;
         case WarOutcome.YouWon:
         case WarOutcome.OpponentWon:
+          warLog = `${outcome.winner} won a war against ${outcome.loser}`;
+          try {
+            await publishGameLog(ch, gs.getUsername(), warLog);
+            return AckType.Ack;
+          } catch (err) {
+            return AckType.NackRequeue;
+          }
         case WarOutcome.Draw:
-          return AckType.Ack;
+          warLog = `A war between ${outcome.attacker} and ${outcome.defender} resulted in a draw`;
+          try {
+            await publishGameLog(ch, gs.getUsername(), warLog);
+            return AckType.Ack;
+          } catch (err) {
+            return AckType.NackRequeue;
+          }
         default:
           const unreachable: never = outcome;
           console.log("Unexpected war resolution: ", unreachable);

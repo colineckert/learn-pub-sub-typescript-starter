@@ -9,16 +9,42 @@ import { GameState } from "../internal/gamelogic/gamestate.js";
 import { commandMove } from "../internal/gamelogic/move.js";
 import { commandSpawn } from "../internal/gamelogic/spawn.js";
 import { subscribeJSON } from "../internal/pubsub/consume.js";
-import { publishJSON } from "../internal/pubsub/publish.js";
+import { publishJSON, publishMsgPack } from "../internal/pubsub/publish.js";
 import {
   ArmyMovesPrefix,
   ExchangePerilDirect,
   ExchangePerilTopic,
+  GameLogSlug,
   PauseKey,
   SimpleQueueType,
   WarRecognitionsPrefix,
 } from "../internal/routing/routing.js";
 import { handlerMove, handlerPause, handlerWar } from "./handers.js";
+import type { GameLog } from "../internal/gamelogic/logs.js";
+
+export async function publishGameLog(
+  channel: amqp.ConfirmChannel,
+  username: string,
+  message: string,
+) {
+  const gameLog: GameLog = {
+    currentTime: new Date(),
+    message,
+    username,
+  };
+
+  try {
+    await publishMsgPack(
+      channel,
+      ExchangePerilTopic,
+      `${GameLogSlug}.${username}`,
+      gameLog,
+    );
+    console.log("Successfully published game log");
+  } catch (err) {
+    console.error("Error publishing game log");
+  }
+}
 
 async function main() {
   const rabbitConnString = "amqp://guest:guest@localhost:5672/";
@@ -64,7 +90,7 @@ async function main() {
     WarRecognitionsPrefix,
     `${WarRecognitionsPrefix}.*`,
     SimpleQueueType.Durable,
-    handlerWar(gameState),
+    handlerWar(gameState, publishConfirmChannel),
   );
 
   while (true) {
