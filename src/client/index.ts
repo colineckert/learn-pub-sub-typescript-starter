@@ -3,6 +3,7 @@ import {
   clientWelcome,
   commandStatus,
   getInput,
+  getMaliciousLog,
   printClientHelp,
 } from "../internal/gamelogic/gamelogic.js";
 import { GameState } from "../internal/gamelogic/gamestate.js";
@@ -65,7 +66,7 @@ async function main() {
 
   const username = await clientWelcome();
   const gameState = new GameState(username);
-  const publishConfirmChannel = await conn.createConfirmChannel();
+  const publishCh = await conn.createConfirmChannel();
 
   await subscribeJSON(
     conn,
@@ -81,7 +82,7 @@ async function main() {
     `${ArmyMovesPrefix}.${username}`,
     `${ArmyMovesPrefix}.*`,
     SimpleQueueType.Transient,
-    handlerMove(gameState, publishConfirmChannel),
+    handlerMove(gameState, publishCh),
   );
   await subscribeJSON(
     conn,
@@ -89,7 +90,7 @@ async function main() {
     WarRecognitionsPrefix,
     `${WarRecognitionsPrefix}.*`,
     SimpleQueueType.Durable,
-    handlerWar(gameState, publishConfirmChannel),
+    handlerWar(gameState, publishCh),
   );
 
   while (true) {
@@ -110,7 +111,7 @@ async function main() {
         const move = commandMove(gameState, words);
         console.log("Move command executed successfully");
         await publishJSON(
-          publishConfirmChannel,
+          publishCh,
           ExchangePerilTopic,
           `${ArmyMovesPrefix}.${username}`,
           move,
@@ -125,7 +126,32 @@ async function main() {
     } else if (command === "help") {
       printClientHelp();
     } else if (command === "spam") {
-      console.log("Spamming not allowed yet!");
+      if (words.length < 2) {
+        console.log("usage: spam <n>");
+        continue;
+      }
+      const raw = words[1];
+      if (!raw) {
+        console.log("usage: spam <n>");
+        continue;
+      }
+      const n = parseInt(raw, 10);
+      if (isNaN(n)) {
+        console.log(`error: ${words[1]} is not a valid number`);
+        continue;
+      }
+      for (let i = 0; i < n; i++) {
+        try {
+          publishGameLog(publishCh, gameState.getUsername(), getMaliciousLog());
+        } catch (err) {
+          console.error(
+            "Failed to publish spam message:",
+            (err as Error).message,
+          );
+          continue;
+        }
+      }
+      console.log(`Published ${n} malicious logs`);
     } else if (command === "quit") {
       console.log("Goodbye!");
       process.exit(0);
