@@ -1,6 +1,5 @@
 import type amqp from "amqplib";
 import type { Channel } from "amqplib";
-import { ExchangePerilDeadLetter } from "../routing/routing.js";
 import { decode } from "@msgpack/msgpack";
 
 export enum SimpleQueueType {
@@ -53,7 +52,7 @@ export async function subscribe<T>(
     simpleQueueType,
   );
 
-  await ch.prefetch(1);
+  await ch.prefetch(10);
 
   await ch.consume(queue.queue, async (msg: amqp.ConsumeMessage | null) => {
     if (!msg) return;
